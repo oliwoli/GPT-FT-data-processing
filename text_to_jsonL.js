@@ -1,24 +1,81 @@
+// iterate over files -------------------------------------------- //
 
-const { encode, decode } = require('gpt-3-encoder');
-let fs = require('fs');
-const { start } = require('repl');
-let text = fs.readFileSync("a-test-sentence.txt", 'utf-8');
-text = clean_text(text);
-let processedFileExists;
-try {
-    let processedText = fs.readFileSync("processed-text.jsonl", 'utf-8');
-    processedFileExists = true;
-} catch (error) {
-    processedFileExists = false;
-    console.log("no corresponding Jsonl file found. Will create!")
-}
-
-let encoded = encode(text);
-let decoded = decode(encoded);
-const MAX_CHARACTERS = 4200;
-
+const fs = require('fs');
+const path = require('path');
 let date = new Date().toJSON();
 
+function flatten(lists) {
+    return lists.reduce((a, b) => a.concat(b), []);
+}
+
+let directories = getDirectories("./++DATA/");
+
+let directoriesRecursive = getDirectoriesRecursive("./++DATA/");
+
+function getDirectories(srcpath) {
+    return fs.readdirSync(srcpath)
+        .map(file => path.join(srcpath, file))
+        .filter(path => fs.statSync(path).isDirectory());
+}
+
+function getDirectoriesRecursive(srcpath) {
+    return [srcpath, ...flatten(getDirectories(srcpath).map(getDirectoriesRecursive))];
+}
+
+directoriesRecursive.forEach(folder => {
+    fs.readdir(folder, (err, files) => {
+        files.forEach(file => {
+            if (! fs.lstatSync(path.resolve(folder, file)).isDirectory()) {
+                let filePath = `${folder}\\${file}`;
+                let createProcFile = createProcessedFile([filePath, file, folder]);
+                if (createProcFile) {
+                    let text = fs.readFileSync(filePath, 'utf-8');
+                    //console.log(text);
+                    text = clean_text(text);
+                    split_by_customSeperator(text, [filePath, file, folder]);
+                }
+                
+
+            }
+        });
+    });
+});
+
+// ______________________________________________________________________________________//
+
+const { encode, decode } = require('gpt-3-encoder');
+
+function createProcessedFile(fileInfo) {
+    let newFileName = `processed_${fileInfo[1]}.jsonl`
+    try {
+        fs.writeFile(`++PROCESSED\\${newFileName}`, '', function (err) {
+            if (err) throw err;
+            console.log(`File "${newFileName}" created successfully.`);
+        });
+        return true;
+    } catch (error) {
+        // file already exists
+        let deleteContent = deleteFileContent(pathToFile);
+        if (deleteContent == true) return true;
+        else return false
+    }
+}
+
+function writeToProcessedFile(textStr, fileInfo) {
+    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
+    let newFileName = `processed_${fileInfo[1]}.jsonl`
+    try {
+        fs.appendFile(`++PROCESSED\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
+            if (err) return console.log(err);
+        });
+        return true;
+    } catch (error) {
+        console.log("could not append to file.")
+    }
+}
+
+
+const MAX_CHARACTERS = 4200;
 function gpt_encode(str, start, end) {
     switch (arguments.length) {
         case 1: start = 0;
@@ -39,18 +96,6 @@ function gpt_decode(array, start, end) {
     return decode(array.slice(start, end))
 }
 
-function clean_text(text) {
-    let output = fix_line_breaks(text);
-    output = fix_quotes(output);
-    try {
-        let output_withNoHTML = output.replace(/<\/?[^>]+(>|$)/g, "");
-        return output_withNoHTML
-    } catch (error) {
-        console.log("error while trying to remove HTML tags.")
-        return output
-    }
-}
-
 function fix_line_breaks(text) {
     let output = text.replace(/(?:\r\n|\r|\n)/g, '\\n');
     return output
@@ -59,6 +104,18 @@ function fix_line_breaks(text) {
 function fix_quotes(text) {
     output = text.replace(/"/g, '\\"');
     return output
+}
+
+function clean_text(textStr) {
+    let output = fix_line_breaks(textStr);
+    output = fix_quotes(output);
+    try {
+        let output_withNoHTML = output.replace(/<\/?[^>]+(>|$)/g, "");
+        return output_withNoHTML
+    } catch (error) {
+        console.log("error while trying to remove HTML tags.")
+        return output
+    }
 }
 
 function getIndicesOf(searchStr, str, caseSensitive) {
@@ -93,21 +150,14 @@ function deleteFileContent(file) {
     });
 }
 
-
-let customSeparator = "\\n\\n\\n";
-let customSeparatorIndices = getIndicesOf(customSeparator, text);
-customSeparatorIndices.push(text.length);
-console.log("separatorIndices", customSeparatorIndices);
-
-let idealSplit = [];
-
-for (let index = 1; index < text.length; index++) {
-    if (index % MAX_CHARACTERS === 0) idealSplit.push(index)
-    if (index == text.length - 1 && index < MAX_CHARACTERS) idealSplit.push(text.length / 2)
+function setIdealSplit(textStr) {
+    let idealSplit = [];
+    for (let index = 1; index < textStr.length; index++) {
+        if (index % MAX_CHARACTERS === 0) idealSplit.push(index)
+        if (index == textStr.length - 1 && index < MAX_CHARACTERS) idealSplit.push(textStr.length / 2)
+    }
+    return idealSplit
 }
-
-console.log("ideal split: ", idealSplit);
-
 
 function defineSplitPoints(arr, targetArray) {
     output = [];
@@ -118,12 +168,10 @@ function defineSplitPoints(arr, targetArray) {
     return output
 }
 
-if (processedFileExists) deleteFileContent('processed-text.jsonl')
-// delete content inside processed document ( in case the script is run twice )
-
-console.log("text length: ", text.length)
-
-function split_by_customSeperator(textStr) {
+function split_by_customSeperator(textStr, fileInfo) {
+    let customSeparator = "\\n\\n\\n";
+    let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
+    customSeparatorIndices.push(textStr.length);
     for (let i = 0, startPoint; i < customSeparatorIndices.length; i++) {
         let splitText;
         let endPoint = customSeparatorIndices[i];
@@ -140,86 +188,41 @@ function split_by_customSeperator(textStr) {
             while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
                 endPoint -= 2
             }
-            
+
             if (i < customSeparatorIndices.length) splitText = textStr.slice(startPoint, endPoint);
             else splitText = textStr.slice(startPoint, textStr[textStr.length - 1]);
         }
         splitText = splitText.trim();
-        let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${splitText}"}` + "\n";
         if (splitText == "") continue;
-
-        console.log(gpt_encode(splitText).length);
-        let writeFile = checkTokenCountAndWrite(splitText);
-
-        if (writeFile == false) {
-            console.log("yo that shiits more than 2000 tokens");
-            let textSplitByPunctuation = splitTextBySeperator(splitText, [". ", "! ", "? ", "\\n"]);
-            textSplitByPunctuation.forEach(element => {
-                let writeToFile = checkTokenCountAndWrite(element);
-                // console.log(`might've wrote something: ${element}`)
-
-                if (writeToFile == false) {
-                    let textSplitBySpace = splitTextBySeperator(splitText, [" "]);
-                    textSplitBySpace.forEach(element => {
-                        let writeToFile2 = checkTokenCountAndWrite(element);
-                        if (writeToFile2 == false) {
-                            console.log("script too dumb to split this properly. skipping...");
-                        }
-                    });
-                }
-            });
+        if (gpt_encode(splitText).length < 2000 && splitText.length > 1) {
+            writeToProcessedFile(splitText, fileInfo);
+        }
+        else {
+            let consoleTextPreview = splitText.slice(0, 50);
+            console.log(`Block: "${consoleTextPreview}..." of file ${fileInfo[1]} has >2000 tokens. Splitting by spaces and line breaks.`);
+            split_by_spacesAndBreaks(splitText, fileInfo);
+            continue;
         }
     }
 }
 
-function checkTokenCountAndWrite(textStr) {
-    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
-
-    if (gpt_encode(textStr).length < 2000 && gpt_encode(textStr).length !== 0) {
-        fs.appendFile('processed-text.jsonl', paragraphIntoPromptJsonL, function (err) {
-            if (err) return console.log(err);
-        });
-        console.log(`wrote something. token count: ${gpt_encode(textStr).length}`)
-        return true;
-    }
-    else {
-        console.log(`Too many tokens. counted: ${gpt_encode(textStr).length}`)
-        return false;
-    }
-
-}
-
-split_by_customSeperator(text);
-
-function pick(arg, def) {
-    return (typeof arg == 'undefined' ? def : arg);
-}
-
-function splitTextBySeperator(textStr, seperatorsAsArray) {
-    textStr = pick(textStr, []);
-    let indices = [];
-
-    seperatorsAsArray.forEach(element => {
-        IndicesInText = getIndicesOf(element, textStr);
-        IndicesInText.forEach(element => indices.push(element));
-    });
-    //sort and remove duplicates
-    indices.sort((a, b) => a - b);
-    indices = [...new Set(indices)];
-
-    let splitPoints = defineSplitPoints(indices, idealSplit);
-    // add length of text to ensure last chunk gets written. might be stupid.
-    splitPoints.push(textStr.length);
-    let outputText = [];
-    for (let i = 0, startPoint; i < splitPoints.length; i++) {
-        let endPoint = splitPoints[i];
+function split_by_spacesAndBreaks(textStr, fileInfo) {
+    let idealSplit = setIdealSplit(textStr);
+    let spaceIndices = getIndicesOf(" ", textStr);
+    let linebreakIndices = getIndicesOf("\\n", textStr);
+    let spacesAndBreaks = [...spaceIndices, ...linebreakIndices];
+    spacesAndBreaks.sort((a, b) => a - b);
+    let splitPoints_spacesAndBreaks = defineSplitPoints(spacesAndBreaks, idealSplit);
+    splitPoints_spacesAndBreaks.push(textStr.length);
+    for (let i = 0, startPoint; i < splitPoints_spacesAndBreaks.length; i++) {
+        let splitText;
+        let endPoint = splitPoints_spacesAndBreaks[i];
         if (i == 0) {
             startPoint = 0;
             splitText = textStr.slice(startPoint, endPoint)
         }
         else {
-            // + 2 because separators are 2 characters long and this removes them. This might be dumb, lead to errors.
-            startPoint = splitPoints[i - 1] + 2;
+            startPoint = splitPoints_spacesAndBreaks[i - 1];
 
             while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
                 startPoint += 2
@@ -227,17 +230,16 @@ function splitTextBySeperator(textStr, seperatorsAsArray) {
             while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
                 endPoint -= 2
             }
-
-            if (i < splitPoints.length) splitText = textStr.slice(startPoint, endPoint);
-            else splitText = textStr.slice(startPoint, text[text.length - 1]);
+            splitText = textStr.slice(startPoint, endPoint);
         }
-
-
         splitText = splitText.trim();
-        outputText.push(splitText)
+        if (gpt_encode(splitText).length < 2000 && splitText.length !== 0) {
+            writeToProcessedFile(splitText, fileInfo);
+        }
+        else {
+            console.log("Could not write file.");
+        }
     }
-    return outputText
 }
-
 
 
