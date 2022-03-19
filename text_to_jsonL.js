@@ -118,7 +118,6 @@ function defineSplitPoints(arr, targetArray) {
     return output
 }
 
-
 if (processedFileExists) deleteFileContent('processed-text.jsonl')
 // delete content inside processed document ( in case the script is run twice )
 
@@ -141,7 +140,7 @@ function split_by_customSeperator(textStr) {
             while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
                 endPoint -= 2
             }
-
+            
             if (i < customSeparatorIndices.length) splitText = textStr.slice(startPoint, endPoint);
             else splitText = textStr.slice(startPoint, textStr[textStr.length - 1]);
         }
@@ -150,113 +149,94 @@ function split_by_customSeperator(textStr) {
         if (splitText == "") continue;
 
         console.log(gpt_encode(splitText).length);
-        if (gpt_encode(splitText).length < 2000) {
-            fs.appendFile('processed-text.jsonl', paragraphIntoPromptJsonL, function (err) {
-                if (err) return console.log(err);
-                console.log('wrote a block from', startPoint, "to", customSeparatorIndices[i]);
+        let writeFile = checkTokenCountAndWrite(splitText);
+
+        if (writeFile == false) {
+            console.log("yo that shiits more than 2000 tokens");
+            let textSplitByPunctuation = splitTextBySeperator(splitText, [". ", "! ", "? ", "\\n"]);
+            textSplitByPunctuation.forEach(element => {
+                let writeToFile = checkTokenCountAndWrite(element);
+                // console.log(`might've wrote something: ${element}`)
+
+                if (writeToFile == false) {
+                    let textSplitBySpace = splitTextBySeperator(splitText, [" "]);
+                    textSplitBySpace.forEach(element => {
+                        let writeToFile2 = checkTokenCountAndWrite(element);
+                        if (writeToFile2 == false) {
+                            console.log("script too dumb to split this properly. skipping...");
+                        }
+                    });
+                }
             });
         }
-        else {
-            console.log("yo that shiits more than 2000 tokens");
-            split_by_spacesAndBreaks(textStr)
-        }
-
-        //otherwise split again
     }
+}
+
+function checkTokenCountAndWrite(textStr) {
+    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
+
+    if (gpt_encode(textStr).length < 2000 && gpt_encode(textStr).length !== 0) {
+        fs.appendFile('processed-text.jsonl', paragraphIntoPromptJsonL, function (err) {
+            if (err) return console.log(err);
+        });
+        console.log(`wrote something. token count: ${gpt_encode(textStr).length}`)
+        return true;
+    }
+    else {
+        console.log(`Too many tokens. counted: ${gpt_encode(textStr).length}`)
+        return false;
+    }
+
 }
 
 split_by_customSeperator(text);
 
-function split_by_spacesAndBreaks(textStr) {
-    let spaceIndices = getIndicesOf(" ", textStr);
-    let linebreakIndices = getIndicesOf("\\n", textStr);
-    let spacesAndBreaks = [...spaceIndices, ...linebreakIndices];
-    spacesAndBreaks.sort((a, b) => a - b);
-    let splitPoints_spacesAndBreaks = defineSplitPoints(spacesAndBreaks, idealSplit);
-    let guessTimateTokens = textStr.length / 4;
-
-    for (let i = 0, startPoint; i < splitPoints_spacesAndBreaks.length; i++) {
-        let splitText;
-        let endPoint = splitPoints_spacesAndBreaks[i];
-        if (i == 0) {
-            startPoint = 0;
-            splitText = textStr.slice(startPoint, endPoint)
-        }
-        else {
-            startPoint = splitPoints_spacesAndBreaks[i - 1];
-            if (i < splitPoints_spacesAndBreaks.length) splitText = textStr.slice(startPoint, endPoint);
-            else splitText = textStr.slice(startPoint, text[text.length - 1]);
-        }
-
-        while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
-            startPoint += 2
-        }
-        while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
-            endPoint -= 2
-        }
-        splitText = splitText.trim();
-
-        let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${splitText}"}` + "\n";
-
-        if (gpt_encode(splitText).length < 2000) {
-            fs.appendFile('processed-text.jsonl', paragraphIntoPromptJsonL, function (err) {
-                if (err) return console.log(err);
-                console.log('wrote a block from', startPoint, "to", splitPoints_spacesAndBreaks[i], "tokencount: ", gpt_encode(splitText).length);
-            });
-        }
-        else {
-            console.log("completion bigger than 2000 tokens!");
-            continue
-        }
-    }
-}
-
 function pick(arg, def) {
     return (typeof arg == 'undefined' ? def : arg);
- }
+}
 
-getSplitText(text, ".", "...")
+function splitTextBySeperator(textStr, seperatorsAsArray) {
+    textStr = pick(textStr, []);
+    let indices = [];
 
-function getSplitText(textStr, separator1, separator2) {
-    textStr = pick(textStr, '');
-    separator1 = pick(separator1, ' ');
-
-    let indices1 = getIndicesOf(separator1, textStr);
-    let indices;
-    let indices2;
-    if (separator2 = typeof separator2 !== 'undefined') {
-        indices2 = getIndicesOf(separator1, textStr);
-        indices = [...indices1, ...indices2];
-        indices.sort((a, b) => a - b);
-    }
-    else indices = indices1;
-
-    console.log("i guess, spaces are here: ", indices2);
+    seperatorsAsArray.forEach(element => {
+        IndicesInText = getIndicesOf(element, textStr);
+        IndicesInText.forEach(element => indices.push(element));
+    });
+    //sort and remove duplicates
+    indices.sort((a, b) => a - b);
+    indices = [...new Set(indices)];
 
     let splitPoints = defineSplitPoints(indices, idealSplit);
-
+    // add length of text to ensure last chunk gets written. might be stupid.
+    splitPoints.push(textStr.length);
+    let outputText = [];
     for (let i = 0, startPoint; i < splitPoints.length; i++) {
-        let splitText;
         let endPoint = splitPoints[i];
         if (i == 0) {
             startPoint = 0;
             splitText = textStr.slice(startPoint, endPoint)
         }
         else {
-            startPoint = splitPoints[i - 1];
+            // + 2 because separators are 2 characters long and this removes them. This might be dumb, lead to errors.
+            startPoint = splitPoints[i - 1] + 2;
+
+            while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
+                startPoint += 2
+            }
+            while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
+                endPoint -= 2
+            }
+
             if (i < splitPoints.length) splitText = textStr.slice(startPoint, endPoint);
             else splitText = textStr.slice(startPoint, text[text.length - 1]);
         }
 
-        while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
-            startPoint += 2
-        }
-        while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
-            endPoint -= 2
-        }
+
         splitText = splitText.trim();
-        return splitText
+        outputText.push(splitText)
     }
+    return outputText
 }
 
 
