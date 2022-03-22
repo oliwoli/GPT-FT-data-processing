@@ -8,7 +8,7 @@ Still in very early stages.
 npm run proc
 npm run proc-f
 ```` 
-To process all textfiles. The script makes a new file called `processed_(filename)` in the *"++PROCESSED"* folder. After that it will create a single merged file of all the jsonl files in the processed folder. 
+To process all textfiles. The script makes a new file called `processed_(filename)` in the *"++PROCESSED"* folder. After that it will create a single merged file of all the jsonl files in the processed/merged folder. Keep in mind that the script does not yet handle csv, excel-type file types.
 
 You can also run `node text_to_jsonL.js` or `node mergeFiles.js` to do these steps individually.
 
