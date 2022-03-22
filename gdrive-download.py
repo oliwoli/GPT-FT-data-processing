@@ -26,7 +26,8 @@ def main():
       for file_name in os.listdir(directory):
           # construct full file DL_DIR
           file = directory + file_name
-          if os.path.isfile(file):
+          print(file_name)
+          if os.path.isfile(file) and file_name != ".gitignore":
               print('Deleting file:', file)
               os.remove(file)
 
