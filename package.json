@@ -10,7 +10,7 @@
   },
   "scripts": {
     "proc": "node text_to_jsonL.js && node mergeFiles.js",
-    "drivedown": "py gdrive_download.js",
+    "drivedown": "py gdrive_download.py",
     "drivedown force": "py gdrive-download.py force",
     "proc-f": "py gdrive-download.py force && node text_to_jsonL.js && node mergeFiles.js",
     "test": "echo \"Error: no test specified\" && exit 1"
