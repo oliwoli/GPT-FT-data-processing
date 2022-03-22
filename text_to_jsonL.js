@@ -2,15 +2,14 @@
 
 const fs = require('fs');
 const path = require('path');
-let date = new Date().toJSON();
 
 function flatten(lists) {
     return lists.reduce((a, b) => a.concat(b), []);
 }
 
-let directories = getDirectories("./++DATA/");
+let allFiles = getDirectoriesRecursive("./++DATA/");
 
-let directoriesRecursive = getDirectoriesRecursive("./++DATA/");
+const MAX_CHARACTERS = 2400;
 
 function getDirectories(srcpath) {
     return fs.readdirSync(srcpath)
@@ -22,20 +21,19 @@ function getDirectoriesRecursive(srcpath) {
     return [srcpath, ...flatten(getDirectories(srcpath).map(getDirectoriesRecursive))];
 }
 
-directoriesRecursive.forEach(folder => {
+allFiles.forEach(folder => {
     fs.readdir(folder, (err, files) => {
         files.forEach(file => {
-            if (! fs.lstatSync(path.resolve(folder, file)).isDirectory()) {
+            if (!fs.lstatSync(path.resolve(folder, file)).isDirectory()) {
                 let filePath = `${folder}\\${file}`;
                 let createProcFile = createProcessedFile([filePath, file, folder]);
                 if (createProcFile) {
                     let text = fs.readFileSync(filePath, 'utf-8');
-                    //console.log(text);
                     text = clean_text(text);
                     split_by_customSeperator(text, [filePath, file, folder]);
+                    //splitBySeperators(text, [".", "?"], [filePath, file, folder])
+                    //splitBySpacesAndBreaks(text, [filePath, file, folder]);
                 }
-                
-
             }
         });
     });
@@ -44,6 +42,7 @@ directoriesRecursive.forEach(folder => {
 // ______________________________________________________________________________________//
 
 const { encode, decode } = require('gpt-3-encoder');
+const { text } = require('stream/consumers');
 
 function createProcessedFile(fileInfo) {
     let newFileName = `processed_${fileInfo[1]}.jsonl`
@@ -62,7 +61,14 @@ function createProcessedFile(fileInfo) {
 }
 
 function writeToProcessedFile(textStr, fileInfo) {
-    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
+    textBlock = textStr.replace(/\\n\\n\\n/gm, '\\n\\n');
+    let textStart = 2;
+    while (textBlock.slice(0, 2) == '\\"') {
+        textBlock = textBlock.substring(textStart, textBlock.length)
+        textStart++
+    }
+
+    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textBlock}"}` + "\n";
     let newFileName = `processed_${fileInfo[1]}.jsonl`
     try {
         fs.appendFile(`++PROCESSED\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
@@ -75,7 +81,6 @@ function writeToProcessedFile(textStr, fileInfo) {
 }
 
 
-const MAX_CHARACTERS = 4200;
 function gpt_encode(str, start, end) {
     switch (arguments.length) {
         case 1: start = 0;
@@ -97,12 +102,15 @@ function gpt_decode(array, start, end) {
 }
 
 function fix_line_breaks(text) {
-    let output = text.replace(/(?:\r\n|\r|\n)/g, '\\n');
+    let output = text.replace(/\\/gm, "\\\\")
+    output = output.replace(/(?:\r\n|\r|\n)/g, '\\n');
     return output
 }
 
 function fix_quotes(text) {
-    output = text.replace(/"/g, '\\"');
+    let output = text.replace(/[„“”]/g, '"');
+    output = output.replace(/[‘’]/g, "'");
+    output = output.replace(/"/g, '\\"');
     return output
 }
 
@@ -154,8 +162,9 @@ function setIdealSplit(textStr) {
     let idealSplit = [];
     for (let index = 1; index < textStr.length; index++) {
         if (index % MAX_CHARACTERS === 0) idealSplit.push(index)
-        if (index == textStr.length - 1 && index < MAX_CHARACTERS) idealSplit.push(textStr.length / 2)
+        //if (index == textStr.length - 1 && index < MAX_CHARACTERS) idealSplit.push(textStr.length / 2)
     }
+    idealSplit.sort((a, b) => a - b);
     return idealSplit
 }
 
@@ -169,7 +178,7 @@ function defineSplitPoints(arr, targetArray) {
 }
 
 function split_by_customSeperator(textStr, fileInfo) {
-    let customSeparator = "\\n\\n\\n";
+    let customSeparator = "\\n\\n\\n\\n";
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
     customSeparatorIndices.push(textStr.length);
     for (let i = 0, startPoint; i < customSeparatorIndices.length; i++) {
@@ -177,18 +186,22 @@ function split_by_customSeperator(textStr, fileInfo) {
         let endPoint = customSeparatorIndices[i];
         if (i == 0) {
             startPoint = 0;
+            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
+                startPoint += 2
+            }
+            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
+                endPoint -= 2
+            }
             splitText = textStr.slice(startPoint, endPoint);
         }
         else {
             startPoint = customSeparatorIndices[i - 1] + customSeparator.length;
-
-            while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
+            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
                 startPoint += 2
             }
-            while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
+            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
                 endPoint -= 2
             }
-
             if (i < customSeparatorIndices.length) splitText = textStr.slice(startPoint, endPoint);
             else splitText = textStr.slice(startPoint, textStr[textStr.length - 1]);
         }
@@ -199,14 +212,67 @@ function split_by_customSeperator(textStr, fileInfo) {
         }
         else {
             let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Block: "${consoleTextPreview}..." of file ${fileInfo[1]} has >2000 tokens. Splitting by spaces and line breaks.`);
-            split_by_spacesAndBreaks(splitText, fileInfo);
+            console.log(`Block: \u001b[1;32m"${consoleTextPreview}..."\u001b[0m of file \u001b[1;34m${fileInfo[1]}\u001b[0m has >2000 tokens. Splitting by punctuation.`);
+            splitBySeperators(splitText, [". ", "...\\n", ".\\n", "? ", "?\\n"], fileInfo)
             continue;
         }
     }
 }
 
-function split_by_spacesAndBreaks(textStr, fileInfo) {
+
+function splitBySeperators(textStr, seperators, fileInfo) {
+    let idealSplit = setIdealSplit(textStr);
+    let seperatorIndices = [];
+
+    seperators.forEach(seperator => {
+        let seperatorInText = getIndicesOf(seperator, textStr);
+        seperatorInText = seperatorInText.map(n => n + seperator.length)
+        seperatorIndices.push(...seperatorInText)
+    });
+
+    let splitPoints = defineSplitPoints(seperatorIndices, idealSplit);
+    splitPoints.sort((a, b) => a - b);
+    splitPoints.push(textStr.length)
+
+    for (let i = 0, startPoint; i < splitPoints.length; i++) {
+        let splitText;
+        let endPoint = splitPoints[i];
+        if (i == 0) {
+            startPoint = 0;
+            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
+                startPoint += 2
+            }
+            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
+                endPoint -= 2
+            }
+            splitText = textStr.slice(startPoint, endPoint)
+        }
+        else {
+            startPoint = splitPoints[i - 1];
+            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
+                startPoint += 2
+            }
+            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
+                endPoint -= 2
+            }
+            splitText = textStr.slice(startPoint, endPoint);
+        }
+        splitText = splitText.trim();
+        let tokenCount = gpt_encode(splitText).length;
+        if (tokenCount < 2000 && splitText.length !== 0) {
+            writeToProcessedFile(splitText, fileInfo);
+        }
+        else {
+            let consoleTextPreview = splitText.slice(0, 50);
+            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileInfo[1]}. Tokencount: ${tokenCount} `);
+        }
+
+    }
+
+}
+
+
+function splitBySpacesAndBreaks(textStr, fileInfo) {
     let idealSplit = setIdealSplit(textStr);
     let spaceIndices = getIndicesOf(" ", textStr);
     let linebreakIndices = getIndicesOf("\\n", textStr);
@@ -233,11 +299,13 @@ function split_by_spacesAndBreaks(textStr, fileInfo) {
             splitText = textStr.slice(startPoint, endPoint);
         }
         splitText = splitText.trim();
-        if (gpt_encode(splitText).length < 2000 && splitText.length !== 0) {
+        let tokenCount = gpt_encode(splitText).length;
+        if (tokenCount < 2000 && splitText.length !== 0) {
             writeToProcessedFile(splitText, fileInfo);
         }
         else {
-            console.log("Could not write file.");
+            let consoleTextPreview = splitText.slice(0, 50);
+            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileInfo[1]}. Tokencount: ${tokenCount} `);
         }
     }
 }

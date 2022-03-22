@@ -1,3 +1,9 @@
 # Default ignored files
 notes.txt
 /testing
+/++DATA
+/++PROCESSED
+/__pycache__
+/manual-data
+client_secrets.json
+token.json

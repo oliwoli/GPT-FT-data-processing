@@ -1,0 +1,28 @@
+{
+  "name": "potentia-passiva-tools",
+  "version": "1.0.0",
+  "description": "Still in very early stages.",
+  "main": "index.js",
+  "dependencies": {
+    "async": "^3.2.3",
+    "googleapis": "^97.0.0",
+    "gpt-3-encoder": "^1.1.3"
+  },
+  "scripts": {
+    "proc": "node text_to_jsonL.js && node mergeFiles.js",
+    "drivedown": "py gdrive_download.js",
+    "drivedown force": "py gdrive-download.py force",
+    "proc-f": "py gdrive-download.py force && node text_to_jsonL.js && node mergeFiles.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oliwoli/PotentiaPassiva-DataProcessing.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/oliwoli/PotentiaPassiva-DataProcessing/issues"
+  },
+  "homepage": "https://github.com/oliwoli/PotentiaPassiva-DataProcessing#readme"
+}
