@@ -24,7 +24,7 @@ function getDirectoriesRecursive(srcpath) {
 allFiles.forEach(folder => {
     fs.readdir(folder, (err, files) => {
         files.forEach(file => {
-            if (!fs.lstatSync(path.resolve(folder, file)).isDirectory()) {
+            if (!fs.lstatSync(path.resolve(folder, file)).isDirectory() && !file.includes(".gitignore")) {
                 let filePath = `${folder}\\${file}`;
                 let createProcFile = createProcessedFile([filePath, file, folder]);
                 if (createProcFile) {

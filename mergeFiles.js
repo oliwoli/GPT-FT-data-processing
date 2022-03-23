@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-let date = new Date().toJSON();
+
+const MAIN_FOLDER = "++PROCESSED";
 
 const colors = require('./colors');
 
@@ -20,7 +21,7 @@ function createMergeFile(fileNames) {
     let filename = `merged_${(new Date().toJSON().slice(0, 13))}.jsonl`
 
     try {
-        fs.writeFile(`++PROCESSED\\merged\\${filename}`, '', function (err) {
+        fs.writeFile(`${MAIN_FOLDER}\\merged\\${filename}`, '', function (err) {
             if (err) throw err;
             console.log(`File "${filename}" created successfully.`);
         });
@@ -35,7 +36,7 @@ function createMergeFile(fileNames) {
 
 function writeToMergeFile(mainFile, content) {
     try {
-        fs.appendFile(`./++PROCESSED/merged/${mainFile}`, content, function (err) {
+        fs.appendFile(`${MAIN_FOLDER}/merged/${mainFile}`, content, function (err) {
             if (err) return console.log(err);
         });
         return true;
@@ -46,9 +47,10 @@ function writeToMergeFile(mainFile, content) {
 
 let processed_files = getFileWithPath("./++PROCESSED/");
 let mergeFile = createMergeFile(processed_files)
-
+const gitFile = "${MAIN_FOLDER}\\.gitignore";
 if (mergeFile) {
     processed_files.forEach(element => {
+        if (element.includes(".gitignore")) return; 
         let fileContent = fs.readFileSync(element, 'utf-8'); 
         let isTodo = element.includes("todo_");
         if (!isTodo) writeToMergeFile(mergeFile[1], fileContent)
