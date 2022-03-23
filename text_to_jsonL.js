@@ -41,6 +41,7 @@ allFiles.forEach(folder => {
 const { encode, decode } = require('gpt-3-encoder');
 const { text } = require('stream/consumers');
 const MAX_CHARACTERS = 2400;
+const TOKENLIMIT = 2030;
 const PROCESS_DIR = "++PROCESSED";
 const PROCESS_PREFIX = "proc_";
 const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
@@ -78,9 +79,7 @@ function createProcessedFile(fileInfo) {
 }
 
 function writeToProcessedFile(textStr, fileInfo) {
-    textBlock = textStr.replace(/\\n\\n\\n/gm, '\\n\\n').replace("[a]");
-    let textStart = 2;
-    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textBlock}"}` + "\n";
+    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
     let newFileName = fileName(fileInfo);
     let isComment = textStr.slice(0, 4).includes("[a]");
     if (isComment) return false
@@ -172,10 +171,10 @@ function split_by_customSeperator(textStr, fileInfo) {
             if (i < customSeparatorIndices.length) splitText = textStr.slice(startPoint, endPoint);
             else splitText = textStr.slice(startPoint, textStr[textStr.length - 1]);
         }
-        splitText = splitText.trim();
+        splitText = cleanText.postClean(splitText);
         if (splitText == "") continue;
         let tokenCount = gpt_encode(splitText).length;
-        if (tokenCount < 2000 && splitText.length > 1) {
+        if (tokenCount < TOKENLIMIT && splitText.length > 1) {
             writeToProcessedFile(splitText, fileInfo);
             continue
         }
