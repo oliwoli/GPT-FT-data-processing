@@ -30,7 +30,7 @@ allFiles.forEach(folder => {
             if (!createProcFile) return
             let text = fs.readFileSync(filePath, 'utf-8');
             text = cleanText.clean(text);
-            split_by_customSeperator(text, [filePath, file, folder]);
+            splitByCustomSeperator(text, [filePath, file, folder]);
             //splitBySeperators(text, [".", "?"], [filePath, file, folder])
         });
     });
@@ -46,7 +46,7 @@ const PROCESS_DIR = "++PROCESSED";
 const PROCESS_PREFIX = "proc_";
 const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
 
-function gpt_encode(str, start, end) {
+function gptEncode(str, start, end) {
     switch (arguments.length) {
         case 1: start = 0;
         case 2: end = str.length;
@@ -81,7 +81,7 @@ function createProcessedFile(fileInfo) {
 function writeToProcessedFile(textStr, fileInfo) {
     let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
     let newFileName = fileName(fileInfo);
-    let isComment = textStr.slice(0, 4).includes("[a]");
+    let isComment = textStr.slice(0, 4).match("[a]");
     if (isComment) return false
     try {
         fs.appendFile(`${PROCESS_DIR}\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
@@ -143,49 +143,31 @@ function defineSplitPoints(arr, targetArray) {
     });
     return output
 }
-function split_by_customSeperator(textStr, fileInfo) {
+
+function splitByCustomSeperator(textStr, fileInfo) {
     let customSeparator = "\\n\\n\\n\\n";
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
     customSeparatorIndices.push(textStr.length);
     for (let i = 0, startPoint; i < customSeparatorIndices.length; i++) {
         let splitText;
         let endPoint = customSeparatorIndices[i];
-        if (i == 0) {
-            startPoint = 0;
-            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
-                startPoint += 2
-            }
-            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
-                endPoint -= 2
-            }
-            splitText = textStr.slice(startPoint, endPoint);
-        }
-        else {
-            startPoint = customSeparatorIndices[i - 1] + customSeparator.length;
-            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
-                startPoint += 2
-            }
-            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
-                endPoint -= 2
-            }
-            if (i < customSeparatorIndices.length) splitText = textStr.slice(startPoint, endPoint);
-            else splitText = textStr.slice(startPoint, textStr[textStr.length - 1]);
-        }
-        splitText = cleanText.postClean(splitText);
-        if (splitText == "") continue;
-        let tokenCount = gpt_encode(splitText).length;
-        if (tokenCount < TOKENLIMIT && splitText.length > 1) {
+        if (i == 0) startPoint = 0
+        if (startPoint == endPoint) continue
+        else startPoint = customSeparatorIndices[i - 1] + customSeparator.length;
+        splitText = textStr.slice(startPoint, endPoint);
+        if (splitText.length < 3) continue;
+        splitText = cleanText.postClean(splitText, "\\n");
+        let tokenCount = gptEncode(splitText).length;
+        if (tokenCount < TOKENLIMIT) {
             writeToProcessedFile(splitText, fileInfo);
             continue
         }
-
         let consoleTextPreview = splitText.slice(0, 50);
         console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
         splitBySeperators(splitText, SEPERATORS, fileInfo)
         continue
     }
 }
-
 
 function splitBySeperators(textStr, seperators, fileInfo) {
     let idealSplit = setIdealSplit(textStr);
@@ -201,32 +183,17 @@ function splitBySeperators(textStr, seperators, fileInfo) {
     splitPoints.sort((a, b) => a - b);
     splitPoints.push(textStr.length)
 
-    for (let i = 0, startPoint; i < splitPoints.length; i++) {
+    for (let i = 0; i < splitPoints.length; i++) {
         let splitText;
         let endPoint = splitPoints[i];
-        if (i == 0) {
-            startPoint = 0;
-            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
-                startPoint += 2
-            }
-            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
-                endPoint -= 2
-            }
-            splitText = textStr.slice(startPoint, endPoint)
-        }
-        else {
-            startPoint = splitPoints[i - 1];
-            while (textStr.slice(startPoint, startPoint + 2).includes("\\n")) {
-                startPoint += 2
-            }
-            while (textStr.slice(endPoint - 2, endPoint).includes("\\n")) {
-                endPoint -= 2
-            }
-            splitText = textStr.slice(startPoint, endPoint);
-        }
-        splitText = splitText.trim();
-        let tokenCount = gpt_encode(splitText).length;
-        if (tokenCount < 2000 && splitText.length !== 0) {
+        if (i == 0) startPoint = 0;
+        else startPoint = splitPoints[i - 1];
+        if (i == 0) startPoint = 0
+        splitText = textStr.slice(startPoint, endPoint);
+        if (splitText.length < 3) continue;
+        splitText = cleanText.postClean(splitText, "\\n");
+        let tokenCount = gptEncode(splitText).length;
+        if (tokenCount < 2000) {
             writeToProcessedFile(splitText, fileInfo);
         }
         else {

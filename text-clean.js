@@ -26,9 +26,30 @@ function clean(textStr) {
     return output
 }
 
+
+function trimStart(text, character) {
+    let trim = 0;
+    while (text.slice(trim, trim + character.length).includes(character)) {
+        trim += character.length
+    }
+    output = text.slice(trim, text.length)
+    return output
+}
+
+function trimEnd(text, character) {
+    let trim = 0;
+    while (text.slice(- trim + character.length).match(character)) {
+        trim += character.length
+    }
+    let output = text.slice(0, text.length - trim)
+    return output
+}
+
 // cleaning after text has been analyzed
-function postClean(textStr) {
+function postClean(textStr, character) {
     let output = textStr;
-    output = output.trim().replace(/\\n\\n\\n/gm, '\\n\\n').replace("[a]");
+    output = output.trim().replace(/\\n\\n\\n/gm, '\\n\\n');
+    output = trimStart(output, character);
+    output = trimEnd(output, character);
     return output
 }
