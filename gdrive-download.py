@@ -34,6 +34,7 @@ def main():
     root_folder = create_file_list(DRIVE_ROOT)
 
     if len(sys.argv) > 1: sys_arg = sys.argv[1]
+    else: sys_arg = "none"
     if sys_arg == "force": clearDir(DL_DIR)
     def fileLoop(files):
         for file in files:
