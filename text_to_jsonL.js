@@ -2,14 +2,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const DATA_DIR = "./++DATA";
+const cleanText = require('./text-clean');
+const colors = require('./colors');
 
 function flatten(lists) {
     return lists.reduce((a, b) => a.concat(b), []);
 }
 
-let allFiles = getDirectoriesRecursive("./++DATA/");
-
-const MAX_CHARACTERS = 2400;
+let allFiles = getDirectoriesRecursive(DATA_DIR);
 
 function getDirectories(srcpath) {
     return fs.readdirSync(srcpath)
@@ -29,10 +30,9 @@ allFiles.forEach(folder => {
                 let createProcFile = createProcessedFile([filePath, file, folder]);
                 if (createProcFile) {
                     let text = fs.readFileSync(filePath, 'utf-8');
-                    text = clean_text(text);
+                    text = cleanText.clean(text);
                     split_by_customSeperator(text, [filePath, file, folder]);
                     //splitBySeperators(text, [".", "?"], [filePath, file, folder])
-                    //splitBySpacesAndBreaks(text, [filePath, file, folder]);
                 }
             }
         });
@@ -43,11 +43,30 @@ allFiles.forEach(folder => {
 
 const { encode, decode } = require('gpt-3-encoder');
 const { text } = require('stream/consumers');
+const MAX_CHARACTERS = 2400;
+const PROCESS_DIR = "++PROCESSED"
+const PROCESS_PREFIX = "proc_";
+
+function gpt_encode(str, start, end) {
+    switch (arguments.length) {
+        case 1: start = 0;
+        case 2: end = str.length;
+        case 3: break;
+        default: throw new Error('illegal argument count')
+    }
+    return encode(str).slice(start, end)
+}
+
+function fileName(fileInfo) {
+    processedFileName = `${PROCESS_PREFIX}${fileInfo[1]}.jsonl`
+    return processedFileName
+}
 
 function createProcessedFile(fileInfo) {
-    let newFileName = `processed_${fileInfo[1]}.jsonl`
+    let newFileName = fileName(fileInfo);
+    // this is probably a horrible way of doing this.
     try {
-        fs.writeFile(`++PROCESSED\\${newFileName}`, '', function (err) {
+        fs.writeFile(`${PROCESS_DIR}\\${newFileName}`, '', function (err) {
             if (err) throw err;
             console.log(`File "${newFileName}" created successfully.`);
         });
@@ -67,62 +86,15 @@ function writeToProcessedFile(textStr, fileInfo) {
         textBlock = textBlock.substring(textStart, textBlock.length)
         textStart++
     }
-
     let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textBlock}"}` + "\n";
-    let newFileName = `processed_${fileInfo[1]}.jsonl`
+    let newFileName = fileName(fileInfo);
     try {
-        fs.appendFile(`++PROCESSED\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
+        fs.appendFile(`${PROCESS_DIR}\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
             if (err) return console.log(err);
         });
         return true;
     } catch (error) {
         console.log("could not append to file.")
-    }
-}
-
-
-function gpt_encode(str, start, end) {
-    switch (arguments.length) {
-        case 1: start = 0;
-        case 2: end = str.length;
-        case 3: break;
-        default: throw new Error('illegal argument count')
-    }
-    return encode(str).slice(start, end)
-}
-
-function gpt_decode(array, start, end) {
-    switch (arguments.length) {
-        case 1: start = 0;
-        case 2: end = array.length;
-        case 3: break;
-        default: throw new Error('illegal argument count')
-    }
-    return decode(array.slice(start, end))
-}
-
-function fix_line_breaks(text) {
-    let output = text.replace(/\\/gm, "\\\\")
-    output = output.replace(/(?:\r\n|\r|\n)/g, '\\n');
-    return output
-}
-
-function fix_quotes(text) {
-    let output = text.replace(/[„“”]/g, '"');
-    output = output.replace(/[‘’]/g, "'");
-    output = output.replace(/"/g, '\\"');
-    return output
-}
-
-function clean_text(textStr) {
-    let output = fix_line_breaks(textStr);
-    output = fix_quotes(output);
-    try {
-        let output_withNoHTML = output.replace(/<\/?[^>]+(>|$)/g, "");
-        return output_withNoHTML
-    } catch (error) {
-        console.log("error while trying to remove HTML tags.")
-        return output
     }
 }
 
@@ -212,7 +184,7 @@ function split_by_customSeperator(textStr, fileInfo) {
         }
         else {
             let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Block: \u001b[1;32m"${consoleTextPreview}..."\u001b[0m of file \u001b[1;34m${fileInfo[1]}\u001b[0m has >2000 tokens. Splitting by punctuation.`);
+            console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue}${fileInfo[1]}${colors.default} has >2000 tokens. Splitting by punctuation.`);
             splitBySeperators(splitText, [". ", "...\\n", ".\\n", "? ", "?\\n"], fileInfo)
             continue;
         }
@@ -271,43 +243,5 @@ function splitBySeperators(textStr, seperators, fileInfo) {
 
 }
 
-
-function splitBySpacesAndBreaks(textStr, fileInfo) {
-    let idealSplit = setIdealSplit(textStr);
-    let spaceIndices = getIndicesOf(" ", textStr);
-    let linebreakIndices = getIndicesOf("\\n", textStr);
-    let spacesAndBreaks = [...spaceIndices, ...linebreakIndices];
-    spacesAndBreaks.sort((a, b) => a - b);
-    let splitPoints_spacesAndBreaks = defineSplitPoints(spacesAndBreaks, idealSplit);
-    splitPoints_spacesAndBreaks.push(textStr.length);
-    for (let i = 0, startPoint; i < splitPoints_spacesAndBreaks.length; i++) {
-        let splitText;
-        let endPoint = splitPoints_spacesAndBreaks[i];
-        if (i == 0) {
-            startPoint = 0;
-            splitText = textStr.slice(startPoint, endPoint)
-        }
-        else {
-            startPoint = splitPoints_spacesAndBreaks[i - 1];
-
-            while (textStr.slice(startPoint, startPoint + 2) == "\\n") {
-                startPoint += 2
-            }
-            while (textStr.slice(endPoint - 2, endPoint) == "\\n") {
-                endPoint -= 2
-            }
-            splitText = textStr.slice(startPoint, endPoint);
-        }
-        splitText = splitText.trim();
-        let tokenCount = gpt_encode(splitText).length;
-        if (tokenCount < 2000 && splitText.length !== 0) {
-            writeToProcessedFile(splitText, fileInfo);
-        }
-        else {
-            let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileInfo[1]}. Tokencount: ${tokenCount} `);
-        }
-    }
-}
 
 

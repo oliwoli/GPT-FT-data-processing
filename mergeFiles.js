@@ -45,14 +45,13 @@ function writeToMergeFile(mainFile, content) {
     }
 }
 
-let processed_files = getFileWithPath("./++PROCESSED/");
+let processed_files = getFileWithPath(MAIN_FOLDER);
 let mergeFile = createMergeFile(processed_files)
-const gitFile = "${MAIN_FOLDER}\\.gitignore";
 if (mergeFile) {
     processed_files.forEach(element => {
-        if (element.includes(".gitignore")) return; 
-        let fileContent = fs.readFileSync(element, 'utf-8'); 
-        let isTodo = element.includes("todo_");
+        if (element.includes(".gitignore")) return;
+        let fileContent = fs.readFileSync(element, 'utf-8');
+        let isTodo = element.includes("_todo_");
         if (!isTodo) writeToMergeFile(mergeFile[1], fileContent)
         else console.log(`skipping ${colors.purple}${element}${colors.default}`)
     });
