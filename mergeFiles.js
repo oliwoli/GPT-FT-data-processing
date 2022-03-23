@@ -53,7 +53,7 @@ if (mergeFile) {
         let fileContent = fs.readFileSync(element, 'utf-8');
         let isTodo = element.includes("_todo_");
         if (!isTodo) writeToMergeFile(mergeFile[1], fileContent)
-        else console.log(`skipping ${colors.purple}${element}${colors.default}`)
+        else console.log(`skipping merging file ${colors.purple}${element}${colors.default}`)
     });
     console.log("merged.")
 }

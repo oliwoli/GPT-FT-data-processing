@@ -10,8 +10,6 @@ function flatten(lists) {
     return lists.reduce((a, b) => a.concat(b), []);
 }
 
-let allFiles = getDirectoriesRecursive(DATA_DIR);
-
 function getDirectories(srcpath) {
     return fs.readdirSync(srcpath)
         .map(file => path.join(srcpath, file))
@@ -22,19 +20,18 @@ function getDirectoriesRecursive(srcpath) {
     return [srcpath, ...flatten(getDirectories(srcpath).map(getDirectoriesRecursive))];
 }
 
+let allFiles = getDirectoriesRecursive(DATA_DIR);
 allFiles.forEach(folder => {
     fs.readdir(folder, (err, files) => {
         files.forEach(file => {
-            if (!fs.lstatSync(path.resolve(folder, file)).isDirectory() && !file.includes(".gitignore")) {
-                let filePath = `${folder}\\${file}`;
-                let createProcFile = createProcessedFile([filePath, file, folder]);
-                if (createProcFile) {
-                    let text = fs.readFileSync(filePath, 'utf-8');
-                    text = cleanText.clean(text);
-                    split_by_customSeperator(text, [filePath, file, folder]);
-                    //splitBySeperators(text, [".", "?"], [filePath, file, folder])
-                }
-            }
+            if (fs.lstatSync(path.resolve(folder, file)).isDirectory() || file.includes(".gitignore")) return
+            let filePath = `${folder}\\${file}`;
+            let createProcFile = createProcessedFile([filePath, file, folder]);
+            if (!createProcFile) return
+            let text = fs.readFileSync(filePath, 'utf-8');
+            text = cleanText.clean(text);
+            split_by_customSeperator(text, [filePath, file, folder]);
+            //splitBySeperators(text, [".", "?"], [filePath, file, folder])
         });
     });
 });
@@ -44,8 +41,9 @@ allFiles.forEach(folder => {
 const { encode, decode } = require('gpt-3-encoder');
 const { text } = require('stream/consumers');
 const MAX_CHARACTERS = 2400;
-const PROCESS_DIR = "++PROCESSED"
+const PROCESS_DIR = "++PROCESSED";
 const PROCESS_PREFIX = "proc_";
+const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
 
 function gpt_encode(str, start, end) {
     switch (arguments.length) {
@@ -73,7 +71,7 @@ function createProcessedFile(fileInfo) {
         return true;
     } catch (error) {
         // file already exists
-        let deleteContent = deleteFileContent(pathToFile);
+        let deleteContent = clearFile(pathToFile);
         if (deleteContent == true) return true;
         else return false
     }
@@ -82,10 +80,6 @@ function createProcessedFile(fileInfo) {
 function writeToProcessedFile(textStr, fileInfo) {
     textBlock = textStr.replace(/\\n\\n\\n/gm, '\\n\\n');
     let textStart = 2;
-    while (textBlock.slice(0, 2) == '\\"') {
-        textBlock = textBlock.substring(textStart, textBlock.length)
-        textStart++
-    }
     let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textBlock}"}` + "\n";
     let newFileName = fileName(fileInfo);
     try {
@@ -123,7 +117,7 @@ function findClosest(num, arr) {
     return current
 }
 
-function deleteFileContent(file) {
+function clearFile(file) {
     fs.writeFile(file, "", function (err) {
         if (err) return console.log(err);
         console.log('deleted content');
@@ -148,7 +142,6 @@ function defineSplitPoints(arr, targetArray) {
     });
     return output
 }
-
 function split_by_customSeperator(textStr, fileInfo) {
     let customSeparator = "\\n\\n\\n\\n";
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
@@ -181,13 +174,13 @@ function split_by_customSeperator(textStr, fileInfo) {
         if (splitText == "") continue;
         if (gpt_encode(splitText).length < 2000 && splitText.length > 1) {
             writeToProcessedFile(splitText, fileInfo);
+            continue
         }
-        else {
-            let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue}${fileInfo[1]}${colors.default} has >2000 tokens. Splitting by punctuation.`);
-            splitBySeperators(splitText, [". ", "...\\n", ".\\n", "? ", "?\\n"], fileInfo)
-            continue;
-        }
+
+        let consoleTextPreview = splitText.slice(0, 50);
+        console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue}${fileInfo[1]}${colors.default} has >2000 tokens. Splitting by punctuation.`);
+        splitBySeperators(splitText, SEPERATORS, fileInfo)
+        continue
     }
 }
 
@@ -238,9 +231,7 @@ function splitBySeperators(textStr, seperators, fileInfo) {
             let consoleTextPreview = splitText.slice(0, 50);
             console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileInfo[1]}. Tokencount: ${tokenCount} `);
         }
-
     }
-
 }
 
 
