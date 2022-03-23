@@ -78,10 +78,12 @@ function createProcessedFile(fileInfo) {
 }
 
 function writeToProcessedFile(textStr, fileInfo) {
-    textBlock = textStr.replace(/\\n\\n\\n/gm, '\\n\\n');
+    textBlock = textStr.replace(/\\n\\n\\n/gm, '\\n\\n').replace("[a]");
     let textStart = 2;
     let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textBlock}"}` + "\n";
     let newFileName = fileName(fileInfo);
+    let isComment = textStr.slice(0, 4).includes("[a]");
+    if (isComment) return false
     try {
         fs.appendFile(`${PROCESS_DIR}\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
             if (err) return console.log(err);
@@ -172,13 +174,14 @@ function split_by_customSeperator(textStr, fileInfo) {
         }
         splitText = splitText.trim();
         if (splitText == "") continue;
-        if (gpt_encode(splitText).length < 2000 && splitText.length > 1) {
+        let tokenCount = gpt_encode(splitText).length;
+        if (tokenCount < 2000 && splitText.length > 1) {
             writeToProcessedFile(splitText, fileInfo);
             continue
         }
 
         let consoleTextPreview = splitText.slice(0, 50);
-        console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue}${fileInfo[1]}${colors.default} has >2000 tokens. Splitting by punctuation.`);
+        console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
         splitBySeperators(splitText, SEPERATORS, fileInfo)
         continue
     }
