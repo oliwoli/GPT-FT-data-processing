@@ -5,6 +5,14 @@ const path = require('path');
 const DATA_DIR = "./++DATA";
 const cleanText = require('./text-clean');
 const colors = require('./colors');
+const { encode, decode } = require('gpt-3-encoder');
+const { text } = require('stream/consumers');
+const MAX_CHARACTERS = 2400;
+const TOKENLIMIT = 2030;
+const PROCESS_DIR = "++PROCESSED";
+const PROCESS_PREFIX = "proc_";
+const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
+const logGoodFiles = true;
 
 function flatten(lists) {
     return lists.reduce((a, b) => a.concat(b), []);
@@ -38,14 +46,6 @@ allFiles.forEach(folder => {
 
 // ______________________________________________________________________________________//
 
-const { encode, decode } = require('gpt-3-encoder');
-const { text } = require('stream/consumers');
-const MAX_CHARACTERS = 2400;
-const TOKENLIMIT = 2030;
-const PROCESS_DIR = "++PROCESSED";
-const PROCESS_PREFIX = "proc_";
-const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
-const logGoodFiles = false;
 
 function gptEncode(str, start, end) {
     switch (arguments.length) {
@@ -149,7 +149,7 @@ function splitByCustomSeperator(textStr, fileInfo) {
     let customSeparator = "\\n\\n\\n\\n";
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
     customSeparatorIndices.push(textStr.length);
-    for (let i = 0, startPoint; i < customSeparatorIndices.length; i++) {
+    for (let i = 0, passed = true; i < customSeparatorIndices.length; i++) {
         let splitText;
         let endPoint = customSeparatorIndices[i];
         if (i == 0) startPoint = 0
@@ -162,9 +162,10 @@ function splitByCustomSeperator(textStr, fileInfo) {
         let consoleTextPreview = splitText.slice(0, 50);
         if (tokenCount < TOKENLIMIT) {
             writeToProcessedFile(splitText, fileInfo);
-            if (logGoodFiles) console.log(`Text chunk of file ${colors.blue + fileInfo[1]} ${colors.green} passed!✔️ ${colors.default}`)
+            if (logGoodFiles && i >= customSeparatorIndices.length -1 && passed) console.log(`File ${colors.blue + fileInfo[1]} ${colors.green} passt! ✔️ ${colors.default}`)
             continue
         }  
+        passed = false;
         console.log(`Block: ${colors.yellow}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
         splitBySeperators(splitText, SEPERATORS, fileInfo)
         continue
