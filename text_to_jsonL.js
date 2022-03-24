@@ -45,6 +45,7 @@ const TOKENLIMIT = 2030;
 const PROCESS_DIR = "++PROCESSED";
 const PROCESS_PREFIX = "proc_";
 const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
+const logGoodFiles = false;
 
 function gptEncode(str, start, end) {
     switch (arguments.length) {
@@ -158,12 +159,13 @@ function splitByCustomSeperator(textStr, fileInfo) {
         if (splitText.length < 3) continue;
         splitText = cleanText.postClean(splitText, "\\n");
         let tokenCount = gptEncode(splitText).length;
+        let consoleTextPreview = splitText.slice(0, 50);
         if (tokenCount < TOKENLIMIT) {
             writeToProcessedFile(splitText, fileInfo);
+            if (logGoodFiles) console.log(`Text chunk of file ${colors.blue + fileInfo[1]} ${colors.green} passed!✔️ ${colors.default}`)
             continue
-        }
-        let consoleTextPreview = splitText.slice(0, 50);
-        console.log(`Block: ${colors.green}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
+        }  
+        console.log(`Block: ${colors.yellow}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
         splitBySeperators(splitText, SEPERATORS, fileInfo)
         continue
     }
