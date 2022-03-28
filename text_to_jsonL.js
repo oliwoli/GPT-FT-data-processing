@@ -1,44 +1,37 @@
 // iterate over files -------------------------------------------- //
 
-const fs = require('fs');
 const path = require('path');
-const DATA_DIR = "./++DATA";
+const DATA_DIR = "++DATA";
+const PROCESS_DIR = "++PROCESSED";
 const cleanText = require('./text-clean');
+const dir = require('./getDirectories');
 const colors = require('./colors');
 const { encode, decode } = require('gpt-3-encoder');
 const { text } = require('stream/consumers');
 const MAX_CHARACTERS = 2400;
 const TOKENLIMIT = 2030;
-const PROCESS_DIR = "++PROCESSED";
 const PROCESS_PREFIX = "proc_";
 const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
 const logGoodFiles = true;
 
-function flatten(lists) {
-    return lists.reduce((a, b) => a.concat(b), []);
-}
+const fs = require('fs');
 
-function getDirectories(srcpath) {
-    return fs.readdirSync(srcpath)
-        .map(file => path.join(srcpath, file))
-        .filter(path => fs.statSync(path).isDirectory());
-}
-
-function getDirectoriesRecursive(srcpath) {
-    return [srcpath, ...flatten(getDirectories(srcpath).map(getDirectoriesRecursive))];
-}
-
-let allFiles = getDirectoriesRecursive(DATA_DIR);
+let allFiles = dir.getDirectoriesRecursive(DATA_DIR);
 allFiles.forEach(folder => {
     fs.readdir(folder, (err, files) => {
-        files.forEach(file => {
-            if (fs.lstatSync(path.resolve(folder, file)).isDirectory() || file.includes(".gitignore")) return
-            let filePath = `${folder}\\${file}`;
-            let createProcFile = createProcessedFile([filePath, file, folder]);
+        files.forEach(fileInstance => {
+            if (fs.lstatSync(path.resolve(folder, fileInstance)).isDirectory() || fileInstance.includes(".gitignore")) return
+            let filePath = `${folder}/${fileInstance}`;
+            let file = {
+                name: fileInstance,
+                filePath,
+                folder
+            }
+            let createProcFile = createProcessedFile(file);
             if (!createProcFile) return
             let text = fs.readFileSync(filePath, 'utf-8');
             text = cleanText.clean(text);
-            splitByCustomSeperator(text, [filePath, file, folder]);
+            splitByCustomSeperator(text, file);
             //splitBySeperators(text, [".", "?"], [filePath, file, folder])
         });
     });
@@ -57,35 +50,36 @@ function gptEncode(str, start, end) {
     return encode(str).slice(start, end)
 }
 
-function fileName(fileInfo) {
-    processedFileName = `${PROCESS_PREFIX}${fileInfo[1]}.jsonl`
+function fileName(filename) {
+    let name = path.parse(filename).name
+    processedFileName = `${PROCESS_PREFIX}${name}.jsonl`
     return processedFileName
 }
 
-function createProcessedFile(fileInfo) {
-    let newFileName = fileName(fileInfo);
+function createProcessedFile(fileObj) {
+    let newFileName = fileName(fileObj.name);
     // this is probably a horrible way of doing this.
     try {
-        fs.writeFile(`${PROCESS_DIR}\\${newFileName}`, '', function (err) {
+        fs.writeFile(`${PROCESS_DIR}/${newFileName}`, '', function (err) {
             if (err) throw err;
-            console.log(`File "${newFileName}" created successfully.`);
+            // console.log(`${colors.green}File "${newFileName}" created successfully.${colors.default}`);
         });
         return true;
     } catch (error) {
         // file already exists
-        let deleteContent = clearFile(pathToFile);
+        let deleteContent = clearFile(fileObj.filePath);
         if (deleteContent == true) return true;
         else return false
     }
 }
 
-function writeToProcessedFile(textStr, fileInfo) {
+function writeToProcessedFile(textStr, file) {
     let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
-    let newFileName = fileName(fileInfo);
+    let newFileName = fileName(file.name);
     let isComment = textStr.slice(0, 4).match("[a]");
     if (isComment) return false
     try {
-        fs.appendFile(`${PROCESS_DIR}\\${newFileName}`, paragraphIntoPromptJsonL, function (err) {
+        fs.appendFile(`${PROCESS_DIR}/${newFileName}`, paragraphIntoPromptJsonL, function (err) {
             if (err) return console.log(err);
         });
         return true;
@@ -130,7 +124,6 @@ function setIdealSplit(textStr) {
     let idealSplit = [];
     for (let index = 1; index < textStr.length; index++) {
         if (index % MAX_CHARACTERS === 0) idealSplit.push(index)
-        //if (index == textStr.length - 1 && index < MAX_CHARACTERS) idealSplit.push(textStr.length / 2)
     }
     idealSplit.sort((a, b) => a - b);
     return idealSplit
@@ -145,7 +138,7 @@ function defineSplitPoints(arr, targetArray) {
     return output
 }
 
-function splitByCustomSeperator(textStr, fileInfo) {
+function splitByCustomSeperator(textStr, file) {
     let customSeparator = "\\n\\n\\n\\n";
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
     customSeparatorIndices.push(textStr.length);
@@ -160,19 +153,21 @@ function splitByCustomSeperator(textStr, fileInfo) {
         splitText = cleanText.postClean(splitText, "\\n");
         let tokenCount = gptEncode(splitText).length;
         let consoleTextPreview = splitText.slice(0, 50);
+        let passedCondition = logGoodFiles && i >= customSeparatorIndices.length -1 && passed;
         if (tokenCount < TOKENLIMIT) {
-            writeToProcessedFile(splitText, fileInfo);
-            if (logGoodFiles && i >= customSeparatorIndices.length -1 && passed) console.log(`File ${colors.blue + fileInfo[1]} ${colors.green} passt! ✔️ ${colors.default}`)
+            writeToProcessedFile(splitText, file);
+            if (passedCondition) console.log(`${colors.blue + file.name} ${colors.green} passt! ✔️ ${colors.default}`)
             continue
         }  
         passed = false;
-        console.log(`Block: ${colors.yellow}"${consoleTextPreview}..."${colors.default} of file ${colors.blue + fileInfo[1] + colors.default} has ${colors.yellow + tokenCount + colors.default} tokens. Splitting by punctuation.`);
-        splitBySeperators(splitText, SEPERATORS, fileInfo)
+        let textBlockLocation = colors.cyan + `(${i+1}/${customSeparatorIndices.length})`+ colors.default
+        console.log(`${colors.yellow + file.name + colors.default} block has ${colors.red + tokenCount + colors.default} tokens. At ${textBlockLocation}: "${consoleTextPreview}..."${colors.default}.`);
+        splitBySeperators(splitText, SEPERATORS, file)
         continue
     }
 }
 
-function splitBySeperators(textStr, seperators, fileInfo) {
+function splitBySeperators(textStr, seperators, fileObj) {
     let idealSplit = setIdealSplit(textStr);
     let seperatorIndices = [];
 
@@ -197,11 +192,11 @@ function splitBySeperators(textStr, seperators, fileInfo) {
         splitText = cleanText.postClean(splitText, "\\n");
         let tokenCount = gptEncode(splitText).length;
         if (tokenCount < 2000) {
-            writeToProcessedFile(splitText, fileInfo);
+            writeToProcessedFile(splitText, fileObj);
         }
         else {
             let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileInfo[1]}. Tokencount: ${tokenCount} `);
+            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileObj.name}. Tokencount: ${tokenCount} `);
         }
     }
 }

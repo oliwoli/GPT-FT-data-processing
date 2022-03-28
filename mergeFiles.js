@@ -21,9 +21,9 @@ function createMergeFile(fileNames) {
     let filename = `merged_${(new Date().toJSON().slice(0, 13))}.jsonl`
 
     try {
-        fs.writeFile(`${MAIN_FOLDER}\\merged\\${filename}`, '', function (err) {
+        fs.writeFile(`${MAIN_FOLDER}\/merged\/${filename}`, '', function (err) {
             if (err) throw err;
-            console.log(`File "${filename}" created successfully.`);
+            console.log(colors.green + `File "${filename}" created successfully.` + colors.default);
         });
         return [true, filename];
     } catch (error) {
@@ -46,14 +46,15 @@ function writeToMergeFile(mainFile, content) {
 }
 
 let processed_files = getFileWithPath(MAIN_FOLDER);
+console.log(colors.purple + "\n ***** MERGING FILES *****" + colors.default)
 let mergeFile = createMergeFile(processed_files)
 if (mergeFile) {
     processed_files.forEach(element => {
         if (element.includes(".gitignore")) return;
         let fileContent = fs.readFileSync(element, 'utf-8');
+        let fileName = path.parse(element).name;
         let isTodo = element.includes("_todo_");
         if (!isTodo) writeToMergeFile(mergeFile[1], fileContent)
-        else console.log(`skipping merging file ${colors.purple}${element}${colors.default}`)
+        else console.log(`skip ${colors.purple}${fileName}${colors.default}`)
     });
-    console.log("merged.")
 }

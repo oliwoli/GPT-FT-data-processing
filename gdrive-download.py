@@ -27,7 +27,7 @@ def main():
 
     def create_file_list(id):
       folderId = id
-      query = f"parents = '{folderId}'"
+      query = f"parents = '{folderId}' and trashed = false"
       fileList = drive.ListFile({
           'q': query
       }).GetList()
