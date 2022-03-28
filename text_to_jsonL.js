@@ -32,7 +32,6 @@ allFiles.forEach(folder => {
             let text = fs.readFileSync(filePath, 'utf-8');
             text = cleanText.clean(text);
             splitByCustomSeperator(text, file);
-            //splitBySeperators(text, [".", "?"], [filePath, file, folder])
         });
     });
 });
@@ -56,8 +55,8 @@ function fileName(filename) {
     return processedFileName
 }
 
-function createProcessedFile(fileObj) {
-    let newFileName = fileName(fileObj.name);
+function createProcessedFile(file) {
+    let newFileName = fileName(file.name);
     // this is probably a horrible way of doing this.
     try {
         fs.writeFile(`${PROCESS_DIR}/${newFileName}`, '', function (err) {
@@ -67,7 +66,7 @@ function createProcessedFile(fileObj) {
         return true;
     } catch (error) {
         // file already exists
-        let deleteContent = clearFile(fileObj.filePath);
+        let deleteContent = clearFile(file.filePath);
         if (deleteContent == true) return true;
         else return false
     }
@@ -143,7 +142,7 @@ function splitByCustomSeperator(textStr, file) {
     let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
     customSeparatorIndices.push(textStr.length);
     for (let i = 0, passed = true; i < customSeparatorIndices.length; i++) {
-        let splitText;
+        let splitText, startPoint;
         let endPoint = customSeparatorIndices[i];
         if (i == 0) startPoint = 0
         if (startPoint == endPoint) continue
@@ -182,11 +181,10 @@ function splitBySeperators(textStr, seperators, fileObj) {
     splitPoints.push(textStr.length)
 
     for (let i = 0; i < splitPoints.length; i++) {
-        let splitText;
+        let splitText, startPoint;
         let endPoint = splitPoints[i];
         if (i == 0) startPoint = 0;
         else startPoint = splitPoints[i - 1];
-        if (i == 0) startPoint = 0
         splitText = textStr.slice(startPoint, endPoint);
         if (splitText.length < 3) continue;
         splitText = cleanText.postClean(splitText, "\\n");
