@@ -72,11 +72,36 @@ function createProcessedFile(file) {
     }
 }
 
+function getPromptText(textStr){
+    let promptSearchStr = "[prompt:";
+    let promptOccur = getIndicesOf("[prompt:", textStr.toLowerCase())
+    if (!promptOccur.length > 0 ) return ""
+    promptOccur = promptOccur[0]
+    let promptEnd = getIndicesOf("]", textStr.slice(promptOccur, textStr.length))
+    console.log(promptEnd)
+    promptEnd = Math.min(...promptEnd) + promptOccur
+    
+    let promptText = textStr.slice(promptOccur + promptSearchStr.length, promptEnd).trim();
+    const prompt = {
+        text: promptText,
+        end: promptEnd
+    }
+    return prompt
+    
+}
+
+
 function writeToProcessedFile(textStr, file) {
-    let = paragraphIntoPromptJsonL = `{"prompt": "", "completion": "${textStr}"}` + "\n";
-    let newFileName = fileName(file.name);
-    let isComment = textStr.slice(0, 4).match("[a]");
+    let isComment = textStr.slice(0, 4).includes("[a]");
     if (isComment) return false
+    let prompt = getPromptText(textStr);
+    if (prompt.text) {
+        textStr = textStr.slice(prompt.end + 1, textStr.length).trim()
+        textStr = " " + textStr
+    }
+    let = paragraphIntoPromptJsonL = `{"prompt": "${prompt.text}", "completion": "${textStr}"}` + "\n"
+    let newFileName = fileName(file.name);
+    console.log(prompt.text)
     try {
         fs.appendFile(`${PROCESS_DIR}/${newFileName}`, paragraphIntoPromptJsonL, function (err) {
             if (err) return console.log(err);
@@ -166,7 +191,7 @@ function splitByCustomSeperator(textStr, file) {
     }
 }
 
-function splitBySeperators(textStr, seperators, fileObj) {
+function splitBySeperators(textStr, seperators, file) {
     let idealSplit = setIdealSplit(textStr);
     let seperatorIndices = [];
 
@@ -190,11 +215,11 @@ function splitBySeperators(textStr, seperators, fileObj) {
         splitText = cleanText.postClean(splitText, "\\n");
         let tokenCount = gptEncode(splitText).length;
         if (tokenCount < 2000) {
-            writeToProcessedFile(splitText, fileObj);
+            writeToProcessedFile(splitText, file);
         }
         else {
             let consoleTextPreview = splitText.slice(0, 50);
-            console.log(`Could not write textblock: ${consoleTextPreview} of file ${fileObj.name}. Tokencount: ${tokenCount} `);
+            console.log(`Could not write textblock: ${consoleTextPreview} of file ${file.name}. Tokencount: ${tokenCount} `);
         }
     }
 }
