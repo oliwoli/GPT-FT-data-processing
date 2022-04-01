@@ -6,6 +6,11 @@ function fixLineBreaks(text) {
     return output
 }
 
+function removeStopSeq(text) {
+    let output = text.replace(/###/gm, "")
+    return output
+}
+
 function fixQuotes(text) {
     let output = text.replace(/[„“”]/g, '"');
     output = output.replace(/[‘’]/g, "'");
@@ -23,6 +28,7 @@ function clean(textStr) {
     let output = fixLineBreaks(textStr);
     output = fixQuotes(output);
     output = fixHTML(output);
+    output = removeStopSeq(output)
     return output
 }
 

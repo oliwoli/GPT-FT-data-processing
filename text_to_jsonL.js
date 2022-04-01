@@ -106,10 +106,11 @@ function writeToProcessedFile(textStr, file) {
     if ("text" in file.prompt) {
         if (textStr.toLowerCase().includes("[prompt:")) completion = completion.slice(file.prompt.end + 1, textStr.length).trim()
         completion = cleanText.postClean(completion, "\\n")
-        completion = " " + completion + stopSeq
+        completion = " " + completion
         prompt = file.prompt.text
         hasPrompt = true
     }
+    completion = completion + stopSeq
     let = paragraphIntoPromptJsonL = `{"prompt": "${prompt}", "completion": "${completion}"}` + "\n"
     if (hasPrompt) {
         let = jsonLWithNoPrompt = `{"prompt": "", "completion": "${completion.trim()}"}` + "\n"
