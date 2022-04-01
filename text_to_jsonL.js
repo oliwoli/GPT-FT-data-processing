@@ -12,6 +12,8 @@ const MAX_CHARACTERS = 2400;
 const TOKENLIMIT = 2030;
 const PROCESS_PREFIX = "proc_";
 const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
+const promptSeperator = "(::)";
+const stopSeq = "###";
 const logGoodFiles = true;
 
 const fs = require('fs');
@@ -72,40 +74,53 @@ function createProcessedFile(file) {
     }
 }
 
-function getPromptText(textStr){
+function getPrompt(textStr) {
     let promptSearchStr = "[prompt:";
-    let promptOccur = getIndicesOf("[prompt:", textStr.toLowerCase())
-    if (!promptOccur.length > 0 ) return ""
-    promptOccur = promptOccur[0]
-    let promptEnd = getIndicesOf("]", textStr.slice(promptOccur, textStr.length))
-    console.log(promptEnd)
-    promptEnd = Math.min(...promptEnd) + promptOccur
-    
+    let promptOccur = textStr.toLowerCase().indexOf(promptSearchStr)
+    if (promptOccur == -1 || promptOccur === undefined) {
+        return {}
+    }
+    let promptEnd = textStr.indexOf("]", promptOccur)
+
     let promptText = textStr.slice(promptOccur + promptSearchStr.length, promptEnd).trim();
+    promptText = promptText + promptSeperator;
     const prompt = {
         text: promptText,
         end: promptEnd
     }
     return prompt
-    
 }
 
 
 function writeToProcessedFile(textStr, file) {
     let isComment = textStr.slice(0, 4).includes("[a]");
     if (isComment) return false
-    let prompt = getPromptText(textStr);
-    if (prompt.text) {
-        textStr = textStr.slice(prompt.end + 1, textStr.length).trim()
-        textStr = " " + textStr
+    let completion = textStr.trim()
+    let hasPrompt = false
+    let prompt = ""
+    if ("text" in file.prompt) {
+        if (textStr.toLowerCase().includes("[prompt:")) completion = textStr.slice(file.prompt.end + 1, textStr.length).trim()
+        completion = " " + completion + stopSeq
+        prompt = file.prompt.text
+        hasPrompt = true
     }
-    let = paragraphIntoPromptJsonL = `{"prompt": "${prompt.text}", "completion": "${textStr}"}` + "\n"
+    let = paragraphIntoPromptJsonL = `{"prompt": "${prompt}", "completion": "${completion}"}` + "\n"
+    if (hasPrompt) {
+        let = jsonLWithNoPrompt = `{"prompt": "", "completion": "${completion.trim()}"}` + "\n"
+        console.log(`for file: ${colors.blue + file.name + colors.default}`)
+        console.log(`found${colors.cyan} PROMPT: "${file.prompt.text.slice(0, 25)}..."${colors.default}, completion: "${completion.slice(0, 45)}..."\n`)
+    }
     let newFileName = fileName(file.name);
-    console.log(prompt.text)
     try {
         fs.appendFile(`${PROCESS_DIR}/${newFileName}`, paragraphIntoPromptJsonL, function (err) {
             if (err) return console.log(err);
         });
+        // if it has a prompt, write again but without prompt
+        if (hasPrompt) {
+            fs.appendFile(`${PROCESS_DIR}/${newFileName}`, jsonLWithNoPrompt, function (err) {
+                if (err) return console.log(err);
+            });
+        }
         return true;
     } catch (error) {
         console.log("could not append to file.")
@@ -177,14 +192,15 @@ function splitByCustomSeperator(textStr, file) {
         splitText = cleanText.postClean(splitText, "\\n");
         let tokenCount = gptEncode(splitText).length;
         let consoleTextPreview = splitText.slice(0, 50);
-        let passedCondition = logGoodFiles && i >= customSeparatorIndices.length -1 && passed;
+        let passedCondition = logGoodFiles && i >= customSeparatorIndices.length - 1 && passed;
+        file.prompt = getPrompt(splitText);
         if (tokenCount < TOKENLIMIT) {
             writeToProcessedFile(splitText, file);
             if (passedCondition) console.log(`${colors.blue + file.name} ${colors.green} passt! ✔️ ${colors.default}`)
             continue
-        }  
+        }
         passed = false;
-        let textBlockLocation = colors.cyan + `(${i+1}/${customSeparatorIndices.length})`+ colors.default
+        let textBlockLocation = colors.cyan + `(${i + 1}/${customSeparatorIndices.length})` + colors.default
         console.log(`${colors.yellow + file.name + colors.default} block has ${colors.red + tokenCount + colors.default} tokens. At ${textBlockLocation}: "${consoleTextPreview}..."${colors.default}.`);
         splitBySeperators(splitText, SEPERATORS, file)
         continue
