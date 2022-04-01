@@ -15,20 +15,24 @@ const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
 const promptSeperator = "(::)";
 const stopSeq = "###";
 const logGoodFiles = true;
+const skipProcTodoFiles = true;
 
 const fs = require('fs');
 
-let allFiles = dir.getDirectoriesRecursive(DATA_DIR);
+let allFiles = dir.getDirectoriesRecursive(DATA_DIR)
+//allFiles = allFiles.filter(f => !
+console.log(allFiles)
 allFiles.forEach(folder => {
     fs.readdir(folder, (err, files) => {
-        files.forEach(fileInstance => {
-            if (fs.lstatSync(path.resolve(folder, fileInstance)).isDirectory() || fileInstance.includes(".gitignore")) return
+        files.filter(files => !files.includes(".gitignore")).forEach(fileInstance => {
+            if (fs.lstatSync(path.resolve(folder, fileInstance)).isDirectory()) return
             let filePath = `${folder}/${fileInstance}`;
             let file = {
                 name: fileInstance,
                 filePath,
                 folder
             }
+            if (file.name.includes("todo_") && skipProcTodoFiles) return
             let createProcFile = createProcessedFile(file);
             if (!createProcFile) return
             let text = fs.readFileSync(filePath, 'utf-8');
@@ -95,11 +99,13 @@ function getPrompt(textStr) {
 function writeToProcessedFile(textStr, file) {
     let isComment = textStr.slice(0, 4).includes("[a]");
     if (isComment) return false
-    let completion = textStr.trim()
+    let completion = textStr.trim();
     let hasPrompt = false
     let prompt = ""
+    
     if ("text" in file.prompt) {
-        if (textStr.toLowerCase().includes("[prompt:")) completion = textStr.slice(file.prompt.end + 1, textStr.length).trim()
+        if (textStr.toLowerCase().includes("[prompt:")) completion = completion.slice(file.prompt.end + 1, textStr.length).trim()
+        completion = cleanText.postClean(completion, "\\n")
         completion = " " + completion + stopSeq
         prompt = file.prompt.text
         hasPrompt = true
@@ -108,7 +114,7 @@ function writeToProcessedFile(textStr, file) {
     if (hasPrompt) {
         let = jsonLWithNoPrompt = `{"prompt": "", "completion": "${completion.trim()}"}` + "\n"
         console.log(`for file: ${colors.blue + file.name + colors.default}`)
-        console.log(`found${colors.cyan} PROMPT: "${file.prompt.text.slice(0, 25)}..."${colors.default}, completion: "${completion.slice(0, 45)}..."\n`)
+        console.log(`found${colors.cyan} PROMPT: "${file.prompt.text.slice(0, 29)}..."${colors.default}, completion: "${completion.slice(0, 45)}..."\n`)
     }
     let newFileName = fileName(file.name);
     try {
