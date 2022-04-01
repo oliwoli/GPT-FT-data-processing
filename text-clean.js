@@ -12,14 +12,14 @@ function removeStopSeq(text) {
 }
 
 function fixQuotes(text) {
-    let output = text.replace(/[„“”]/g, '"');
-    output = output.replace(/[‘’]/g, "'");
-    output = output.replace(/"/g, '\\"');
+    let output = text.replace(/[„“”]/gm, '"');
+    output = output.replace(/[‘’´]/gm, "'");
+    output = output.replace(/"/gm, '\\"');
     return output
 }
 
 function fixHTML(text) {
-    let output = text.replace(/<\/?[^>]+(>|$)/g, "");
+    let output = text.replace(/<\/?[^>]+(>|$)/gm, "");
     return output
 }
 
