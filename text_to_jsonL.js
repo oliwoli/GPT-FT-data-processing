@@ -1,23 +1,29 @@
-// iterate over files -------------------------------------------- //
 
+// dependencies
 const path = require('path');
-const DATA_DIR = "++DATA";
-const PROCESS_DIR = "++PROCESSED";
+const fs = require('fs');
 const cleanText = require('./text-clean');
 const dir = require('./getDirectories');
 const colors = require('./colors');
 const { encode, decode } = require('gpt-3-encoder');
 const { text } = require('stream/consumers');
-const MAX_CHARACTERS = 2400;
-const TOKENLIMIT = 2030;
-const PROCESS_PREFIX = "proc_";
-const SEPERATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
-const promptSeperator = "(::)";
-const stopSeq = "###";
-const logGoodFiles = true;
-const skipProcTodoFiles = true;
 
-const fs = require('fs');
+
+// Settings
+const DATA_DIR = "++DATA";
+const PROCESS_DIR = "++PROCESSED";
+const PROCESS_PREFIX = "proc_";
+const CUSTOM_SEPARATOR = "\\n\\n\\n\\n";
+const MAX_CHARACTERS = 2400;
+const SEPARATORS = [". ", "...\\n", ".\\n", "? ", "?\\n"];
+const TOKENLIMIT = 2030;
+const STOP_SEQ = "###";
+const logGoodFiles = true;
+const skipCertainFiles = true;
+const skipFilePrefix = "todo_";
+
+
+// iterate over files -------------------------------------------- //
 
 let allFiles = dir.getDirectoriesRecursive(DATA_DIR)
 //allFiles = allFiles.filter(f => !
@@ -32,7 +38,7 @@ allFiles.forEach(folder => {
                 filePath,
                 folder
             }
-            if (file.name.includes("todo_") && skipProcTodoFiles) return
+            if (file.name.includes(skipFilePrefix) && skipCertainFiles) return
             let createProcFile = createProcessedFile(file);
             if (!createProcFile) return
             let text = fs.readFileSync(filePath, 'utf-8');
@@ -87,7 +93,6 @@ function getPrompt(textStr) {
     let promptEnd = textStr.indexOf("]", promptOccur)
 
     let promptText = textStr.slice(promptOccur + promptSearchStr.length, promptEnd).trim();
-    promptText = promptText + promptSeperator;
     const prompt = {
         text: promptText,
         end: promptEnd
@@ -110,12 +115,10 @@ function writeToProcessedFile(textStr, file) {
         prompt = file.prompt.text
         hasPrompt = true
     }
-    completion = completion + stopSeq
+    completion = completion + STOP_SEQ
     let = paragraphIntoPromptJsonL = `{"prompt": "${prompt}", "completion": "${completion}"}` + "\n"
     if (hasPrompt) {
         let = jsonLWithNoPrompt = `{"prompt": "", "completion": "${completion.trim()}"}` + "\n"
-        console.log(`for file: ${colors.blue + file.name + colors.default}`)
-        console.log(`found${colors.cyan} PROMPT: "${file.prompt.text.slice(0, 29)}..."${colors.default}, completion: "${completion.slice(0, 45)}..."\n`)
     }
     let newFileName = fileName(file.name);
     try {
@@ -130,7 +133,8 @@ function writeToProcessedFile(textStr, file) {
         }
         return true;
     } catch (error) {
-        console.log("could not append to file.")
+        console.log("could not append to file:")
+        console.log(error)
     }
 }
 
@@ -185,15 +189,14 @@ function defineSplitPoints(arr, targetArray) {
 }
 
 function splitByCustomSeperator(textStr, file) {
-    let customSeparator = "\\n\\n\\n\\n";
-    let customSeparatorIndices = getIndicesOf(customSeparator, textStr);
+    let customSeparatorIndices = getIndicesOf(CUSTOM_SEPARATOR, textStr);
     customSeparatorIndices.push(textStr.length);
     for (let i = 0, passed = true; i < customSeparatorIndices.length; i++) {
         let splitText, startPoint;
         let endPoint = customSeparatorIndices[i];
         if (i == 0) startPoint = 0
         if (startPoint == endPoint) continue
-        else startPoint = customSeparatorIndices[i - 1] + customSeparator.length;
+        else startPoint = customSeparatorIndices[i - 1] + CUSTOM_SEPARATOR.length;
         splitText = textStr.slice(startPoint, endPoint);
         if (splitText.length < 3) continue;
         splitText = cleanText.postClean(splitText, "\\n");
@@ -203,13 +206,13 @@ function splitByCustomSeperator(textStr, file) {
         file.prompt = getPrompt(splitText);
         if (tokenCount < TOKENLIMIT) {
             writeToProcessedFile(splitText, file);
-            if (passedCondition) console.log(`${colors.blue + file.name} ${colors.green} passt! ✔️ ${colors.default}`)
+            if (passedCondition) console.log(`${colors.blue + file.name} ${colors.green} passed! ✔️ ${colors.default}`)
             continue
         }
         passed = false;
         let textBlockLocation = colors.cyan + `(${i + 1}/${customSeparatorIndices.length})` + colors.default
         console.log(`${colors.yellow + file.name + colors.default} block has ${colors.red + tokenCount + colors.default} tokens. At ${textBlockLocation}: "${consoleTextPreview}..."${colors.default}.`);
-        splitBySeperators(splitText, SEPERATORS, file)
+        splitBySeperators(splitText, SEPARATORS, file)
         continue
     }
 }

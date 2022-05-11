@@ -35,14 +35,19 @@ The first command will download without replacing existing files, while adding `
 ## Settings
 The most important files are **text_to_jsonL.js** and **mergeFiles.js**.
 
-In **text_tojsonL.js** you can change a few parameters:
+In **text_tojsonL.js** you can change the most important parameters:
 
 - **DATA_DIR**: The directory your data (text files) are in (default: "++DATA")
 - **PROCESS_DIR**: Where you want the processed file to be saved to (default: "++PROCESSED")
 - **PROCESS_PREFIX**: default is "proc_" meaning the file *book.txt* will be saved as *proc_book.jsonl*
-- **MAX_CHARACTERS**: This is the value that gets used as an approximation to split. 
-- **SEPERATORS**: 
+- **CUSTOM_SEPARATOR**: First thing to split the text by (default: 3 empty lines).
+- **MAX_CHARACTERS**: If a text block is bigger than the TOKENLIMIT, it will split it up by the closest SEPERATOR after this amount of characters in the text.
+- **SEPERATORS**: The point at which the script will split the text (if a text chunk is > token limit). Default is [". ", "...\\n", ".\\n", "? ", "?\\n"]
 - **TOKENLIMIT**: Default is 2030, because the max for GPT-3 Davinci as of now is 2000 tokens. 30 extra because it's only an approximation and it's usually less. While this worked for our dataset, you might want to change this if you want to be more careful.
+- **STOP_SEQ**: Stop Sequence. To separate one example from the other. Use the same sequence when prompting the fine tuned model.
+- **logGoodFiles**: Default set to true. If there was no additional separating after the custom separator, log the file as *passed* in the console.
+- **skipCertainFiles**: Default true. Skips files which are named with a certain prefix.
+- **skipFilePrefix**: The prefix for the files that should be ignored by the script. Default: "todo_"
 
 
 
