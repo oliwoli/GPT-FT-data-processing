@@ -1,6 +1,11 @@
 # GPT-3 Fine tuning data processing
 
-Still in very early stages.
+At tool to help prepare text data for fine tuning with OpenAI's GPT.
+Splits a text into individual training examples when there are 3 empty lines between (by default).
+To specify a prompt:
+in your text (your training data), add ``[prompt: your prompt]`` before your wanted completion.
+
+Still in very early stages. 
 
 ## Usage
 
