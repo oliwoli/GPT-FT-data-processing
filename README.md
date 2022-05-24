@@ -1,11 +1,9 @@
 # GPT-3 Fine tuning data processing
 
-At tool to help prepare text data for fine tuning with OpenAI's GPT.
+A tool to help prepare text data for fine tuning with OpenAI's GPT.
 Splits a text into individual training examples when there are 3 empty lines between (by default).
 To specify a prompt:
 in your text (your training data), add ``[prompt: your prompt]`` before your wanted completion.
-
-Still in very early stages. 
 
 ## Usage
 
@@ -54,5 +52,7 @@ In **text_tojsonL.js** you can change the most important parameters:
 - **skipCertainFiles**: Default true. Skips files which are named with a certain prefix.
 - **skipFilePrefix**: The prefix for the files that should be ignored by the script. Default: "todo_"
 
+in **mergeFiles.js** you can change the directory in which you want the merged file to be saved to.
+Default: *++PROCESSED"* (it will create an additional folder called "merged")
 
 
